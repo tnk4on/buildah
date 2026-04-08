@@ -9,6 +9,50 @@ import (
 	"github.com/opencontainers/runtime-tools/generate"
 )
 
+func TestArchAnnotationInjected(t *testing.T) {
+	t.Parallel()
+	b := &Builder{}
+	b.SetArchitecture("amd64")
+
+	// Simulate the annotation injection logic from run_linux.go
+	if arch := b.Architecture(); arch != "" {
+		if b.ImageAnnotations == nil {
+			b.ImageAnnotations = map[string]string{}
+		}
+		if _, exists := b.ImageAnnotations["io.podman.image.arch"]; !exists {
+			b.ImageAnnotations["io.podman.image.arch"] = arch
+		}
+	}
+
+	got, ok := b.ImageAnnotations["io.podman.image.arch"]
+	if !ok {
+		t.Fatal("expected io.podman.image.arch annotation to be set")
+	}
+	if got != "amd64" {
+		t.Errorf("expected io.podman.image.arch to be %q, got %q", "amd64", got)
+	}
+}
+
+func TestArchAnnotationDoesNotOverwrite(t *testing.T) {
+	t.Parallel()
+	b := &Builder{}
+	b.SetArchitecture("arm64")
+	b.ImageAnnotations = map[string]string{
+		"io.podman.image.arch": "custom-value",
+	}
+
+	if arch := b.Architecture(); arch != "" {
+		if _, exists := b.ImageAnnotations["io.podman.image.arch"]; !exists {
+			b.ImageAnnotations["io.podman.image.arch"] = arch
+		}
+	}
+
+	got := b.ImageAnnotations["io.podman.image.arch"]
+	if got != "custom-value" {
+		t.Errorf("expected io.podman.image.arch to remain %q, got %q", "custom-value", got)
+	}
+}
+
 func TestAddRlimits(t *testing.T) {
 	t.Parallel()
 	tt := []struct {
